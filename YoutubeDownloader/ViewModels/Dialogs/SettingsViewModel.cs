@@ -1,50 +1,82 @@
 ﻿using System;
+using System.Collections.Generic;
+using YoutubeDownloader.Framework;
 using YoutubeDownloader.Services;
-using YoutubeDownloader.ViewModels.Framework;
+using YoutubeDownloader.Utils;
+using YoutubeDownloader.Utils.Extensions;
 
 namespace YoutubeDownloader.ViewModels.Dialogs;
 
-public class SettingsViewModel(SettingsService settingsService) : DialogScreen
+public class SettingsViewModel : DialogViewModelBase
 {
-    public bool IsAutoUpdateEnabled
+    private readonly SettingsService _settingsService;
+
+    private readonly DisposableCollector _eventRoot = new();
+
+    public SettingsViewModel(SettingsService settingsService)
     {
-        get => settingsService.IsAutoUpdateEnabled;
-        set => settingsService.IsAutoUpdateEnabled = value;
+        _settingsService = settingsService;
+
+        _eventRoot.Add(_settingsService.WatchAllProperties(OnAllPropertiesChanged));
     }
 
-    public bool IsDarkModeEnabled
+    public IReadOnlyList<ThemeVariant> AvailableThemes { get; } = Enum.GetValues<ThemeVariant>();
+
+    public ThemeVariant Theme
     {
-        get => settingsService.IsDarkModeEnabled;
-        set => settingsService.IsDarkModeEnabled = value;
+        get => _settingsService.Theme;
+        set => _settingsService.Theme = value;
+    }
+
+    public bool IsAutoUpdateEnabled
+    {
+        get => _settingsService.IsAutoUpdateEnabled;
+        set => _settingsService.IsAutoUpdateEnabled = value;
     }
 
     public bool IsAuthPersisted
     {
-        get => settingsService.IsAuthPersisted;
-        set => settingsService.IsAuthPersisted = value;
+        get => _settingsService.IsAuthPersisted;
+        set => _settingsService.IsAuthPersisted = value;
+    }
+
+    public bool ShouldInjectSubtitles
+    {
+        get => _settingsService.ShouldInjectSubtitles;
+        set => _settingsService.ShouldInjectSubtitles = value;
     }
 
     public bool ShouldInjectTags
     {
-        get => settingsService.ShouldInjectTags;
-        set => settingsService.ShouldInjectTags = value;
+        get => _settingsService.ShouldInjectTags;
+        set => _settingsService.ShouldInjectTags = value;
     }
 
     public bool ShouldSkipExistingFiles
     {
-        get => settingsService.ShouldSkipExistingFiles;
-        set => settingsService.ShouldSkipExistingFiles = value;
+        get => _settingsService.ShouldSkipExistingFiles;
+        set => _settingsService.ShouldSkipExistingFiles = value;
     }
 
     public string FileNameTemplate
     {
-        get => settingsService.FileNameTemplate;
-        set => settingsService.FileNameTemplate = value;
+        get => _settingsService.FileNameTemplate;
+        set => _settingsService.FileNameTemplate = value;
     }
 
     public int ParallelLimit
     {
-        get => settingsService.ParallelLimit;
-        set => settingsService.ParallelLimit = Math.Clamp(value, 1, 10);
+        get => _settingsService.ParallelLimit;
+        set => _settingsService.ParallelLimit = Math.Clamp(value, 1, 10);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _eventRoot.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }

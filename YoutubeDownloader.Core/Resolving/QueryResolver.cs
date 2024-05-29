@@ -16,8 +16,7 @@ namespace YoutubeDownloader.Core.Resolving;
 
 public class QueryResolver(IReadOnlyList<Cookie>? initialCookies = null)
 {
-    private readonly YoutubeClient _youtube =
-        new(Http.Client, initialCookies ?? Array.Empty<Cookie>());
+    private readonly YoutubeClient _youtube = new(Http.Client, initialCookies ?? []);
 
     public async Task<QueryResult> ResolveAsync(
         string query,
@@ -40,7 +39,7 @@ public class QueryResolver(IReadOnlyList<Cookie>? initialCookies = null)
         if (isUrl && VideoId.TryParse(query) is { } videoId)
         {
             var video = await _youtube.Videos.GetAsync(videoId, cancellationToken);
-            return new QueryResult(QueryResultKind.Video, video.Title, new[] { video });
+            return new QueryResult(QueryResultKind.Video, video.Title, [video]);
         }
 
         // Channel
@@ -54,9 +53,10 @@ public class QueryResolver(IReadOnlyList<Cookie>? initialCookies = null)
         // Channel (by handle)
         if (isUrl && ChannelHandle.TryParse(query) is { } channelHandle)
         {
-            var channel = await _youtube
-                .Channels
-                .GetByHandleAsync(channelHandle, cancellationToken);
+            var channel = await _youtube.Channels.GetByHandleAsync(
+                channelHandle,
+                cancellationToken
+            );
 
             var videos = await _youtube.Channels.GetUploadsAsync(channel.Id, cancellationToken);
             return new QueryResult(QueryResultKind.Channel, $"Channel: {channel.Title}", videos);
@@ -81,8 +81,7 @@ public class QueryResolver(IReadOnlyList<Cookie>? initialCookies = null)
         // Search
         {
             var videos = await _youtube
-                .Search
-                .GetVideosAsync(query, cancellationToken)
+                .Search.GetVideosAsync(query, cancellationToken)
                 .CollectAsync(20);
 
             return new QueryResult(QueryResultKind.Search, $"Search: {query}", videos);

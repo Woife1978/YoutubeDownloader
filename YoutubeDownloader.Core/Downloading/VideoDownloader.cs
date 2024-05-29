@@ -15,8 +15,7 @@ namespace YoutubeDownloader.Core.Downloading;
 
 public class VideoDownloader(IReadOnlyList<Cookie>? initialCookies = null)
 {
-    private readonly YoutubeClient _youtube =
-        new(Http.Client, initialCookies ?? Array.Empty<Cookie>());
+    private readonly YoutubeClient _youtube = new(Http.Client, initialCookies ?? []);
 
     public async Task<IReadOnlyList<VideoDownloadOption>> GetDownloadOptionsAsync(
         VideoId videoId,
@@ -43,32 +42,36 @@ public class VideoDownloader(IReadOnlyList<Cookie>? initialCookies = null)
         string filePath,
         IVideo video,
         VideoDownloadOption downloadOption,
+        bool includeSubtitles = true,
         IProgress<Percentage>? progress = null,
         CancellationToken cancellationToken = default
     )
     {
-        // If the target container supports subtitles, embed them in the video too
-        var trackInfos = !downloadOption.Container.IsAudioOnly
-            ? (
-                await _youtube.Videos.ClosedCaptions.GetManifestAsync(video.Id, cancellationToken)
-            ).Tracks
-            : Array.Empty<ClosedCaptionTrackInfo>();
+        // Include subtitles in the output container
+        var trackInfos = new List<ClosedCaptionTrackInfo>();
+        if (includeSubtitles && !downloadOption.Container.IsAudioOnly)
+        {
+            var manifest = await _youtube.Videos.ClosedCaptions.GetManifestAsync(
+                video.Id,
+                cancellationToken
+            );
+
+            trackInfos.AddRange(manifest.Tracks);
+        }
 
         var dirPath = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrWhiteSpace(dirPath))
             Directory.CreateDirectory(dirPath);
 
-        await _youtube
-            .Videos
-            .DownloadAsync(
-                downloadOption.StreamInfos,
-                trackInfos,
-                new ConversionRequestBuilder(filePath)
-                    .SetContainer(downloadOption.Container)
-                    .SetPreset(ConversionPreset.Medium)
-                    .Build(),
-                progress?.ToDoubleBased(),
-                cancellationToken
-            );
+        await _youtube.Videos.DownloadAsync(
+            downloadOption.StreamInfos,
+            trackInfos,
+            new ConversionRequestBuilder(filePath)
+                .SetContainer(downloadOption.Container)
+                .SetPreset(ConversionPreset.Medium)
+                .Build(),
+            progress?.ToDoubleBased(),
+            cancellationToken
+        );
     }
 }
