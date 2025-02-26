@@ -24,8 +24,19 @@ public partial class DownloadMultipleSetupViewModel(
     SettingsService settingsService
 ) : DialogViewModelBase<IReadOnlyList<DownloadViewModel>>
 {
-    [ObservableProperty]
-    private string? _title;
+    #region Properties
+
+    public ObservableCollection<IVideo> SelectedVideos { get; } = [];
+
+    public IReadOnlyList<Container> AvailableContainers { get; } =
+        [Container.Mp4, Container.WebM, Container.Mp3, new("ogg")];
+
+    public IReadOnlyList<VideoQualityPreference> AvailableVideoQualityPreferences { get; } =
+        Enum.GetValues<VideoQualityPreference>();
+
+    #endregion
+
+    #region Fields
 
     [ObservableProperty]
     private IReadOnlyList<IVideo>? _availableVideos;
@@ -36,13 +47,12 @@ public partial class DownloadMultipleSetupViewModel(
     [ObservableProperty]
     private VideoQualityPreference _selectedVideoQualityPreference = VideoQualityPreference.Highest;
 
-    public ObservableCollection<IVideo> SelectedVideos { get; } = [];
+    [ObservableProperty]
+    private string? _title;
 
-    public IReadOnlyList<Container> AvailableContainers { get; } =
-        [Container.Mp4, Container.WebM, Container.Mp3, new Container("ogg")];
+    #endregion
 
-    public IReadOnlyList<VideoQualityPreference> AvailableVideoQualityPreferences { get; } =
-        Enum.GetValues<VideoQualityPreference>().Reverse().ToArray();
+    #region Methods
 
     [RelayCommand]
     private void Initialize()
@@ -56,24 +66,31 @@ public partial class DownloadMultipleSetupViewModel(
     private async Task CopyTitleAsync()
     {
         if (Application.Current?.ApplicationLifetime?.TryGetTopLevel()?.Clipboard is { } clipboard)
+        {
             await clipboard.SetTextAsync(Title);
+        }
     }
 
-    private bool CanConfirm() => SelectedVideos.Any();
+    private bool CanConfirm()
+    {
+        return SelectedVideos.Any();
+    }
 
     [RelayCommand(CanExecute = nameof(CanConfirm))]
     private async Task ConfirmAsync()
     {
-        var dirPath = await dialogManager.PromptDirectoryPathAsync();
+        string? dirPath = await dialogManager.PromptDirectoryPathAsync();
         if (string.IsNullOrWhiteSpace(dirPath))
-            return;
-
-        var downloads = new List<DownloadViewModel>();
-        for (var i = 0; i < SelectedVideos.Count; i++)
         {
-            var video = SelectedVideos[i];
+            return;
+        }
 
-            var baseFilePath = Path.Combine(
+        List<DownloadViewModel> downloads = new();
+        for (int i = 0; i < SelectedVideos.Count; i++)
+        {
+            IVideo video = SelectedVideos[i];
+
+            string baseFilePath = Path.Combine(
                 dirPath,
                 FileNameTemplate.Apply(
                     settingsService.FileNameTemplate,
@@ -84,9 +101,11 @@ public partial class DownloadMultipleSetupViewModel(
             );
 
             if (settingsService.ShouldSkipExistingFiles && File.Exists(baseFilePath))
+            {
                 continue;
+            }
 
-            var filePath = PathEx.EnsureUniquePath(baseFilePath);
+            string filePath = PathEx.EnsureUniquePath(baseFilePath);
 
             // Download does not start immediately, so lock in the file path to avoid conflicts
             DirectoryEx.CreateDirectoryForFile(filePath);
@@ -106,4 +125,6 @@ public partial class DownloadMultipleSetupViewModel(
 
         Close(downloads);
     }
+
+    #endregion
 }
